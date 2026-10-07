@@ -29,6 +29,10 @@ if (-not (Test-Path (Join-Path $RepoDir ".git"))) {
     Write-Host "El repositorio Git ya existe en esta carpeta."
 }
 
+# Configurar identidad local de Git para el estudiante
+git config user.name "Javier Torrico Sejas"
+git config user.email "javiertorricos@users.noreply.github.com"
+
 # Crear .gitignore adecuado para Excel y Windows
 $gitIgnoreContent = @"
 # Archivos temporales de Office / Excel
