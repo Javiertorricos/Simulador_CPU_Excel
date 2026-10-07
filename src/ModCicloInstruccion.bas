@@ -30,7 +30,7 @@ Private mCondicionSalto As Boolean
 ''' </summary>
 Public Sub Paso_Fase()
     If ModCPU.Halted Then
-        Call ModInterfaz.LogMensaje "CPU DETENIDO (HLT): Presione REINICIAR."
+        Call ModInterfaz.LogMensaje("CPU DETENIDO (HLT): Presione REINICIAR.")
         Exit Sub
     End If
     
@@ -67,7 +67,7 @@ End Sub
 ''' </summary>
 Public Sub Modo_Continuo()
     If ModCPU.Halted Then
-        Call ModInterfaz.LogMensaje "CPU DETENIDO (HLT): Presione REINICIAR antes de ejecutar."
+        Call ModInterfaz.LogMensaje("CPU DETENIDO (HLT): Presione REINICIAR antes de ejecutar.")
         Exit Sub
     End If
     
@@ -83,17 +83,17 @@ Public Sub Modo_Continuo()
         Call Paso_Fase
         
         ' Retardo configurable para permitir observar la animacion
-        Call ModCicloInstruccion.DormirMs retardoSeg
+        Call ModCicloInstruccion.DormirMs(retardoSeg)
         DoEvents
     Loop
     
     ModCPU.EnEjecucion = False
     If ModCPU.Halted Then
         ModCPU.EstadoCPU = "HALT"
-        Call ModInterfaz.LogMensaje "PROGRAMA FINALIZADO CON EXITO: Instruccion HLT alcanzada."
+        Call ModInterfaz.LogMensaje("PROGRAMA FINALIZADO CON EXITO: Instruccion HLT alcanzada.")
     Else
         ModCPU.EstadoCPU = "PAUSADO"
-        Call ModInterfaz.LogMensaje "Ejecucion pausada por el usuario."
+        Call ModInterfaz.LogMensaje("Ejecucion pausada por el usuario.")
     End If
     
     Call ModCPU.CPU_ActualizarUI
@@ -122,15 +122,15 @@ End Sub
 Public Sub Fase_Fetch()
     ModCPU.FaseActual = "FETCH"
     ModCPU.EstadoCPU = "FETCH"
-    Call ModInterfaz.ActualizarFaseUI "FETCH"
+    Call ModInterfaz.ActualizarFaseUI("FETCH")
     
     ' 1. Transferencia PC -> MAR
     ModCPU.MAR = ModCPU.PC
-    Call ModInterfaz.ResaltarBus "DIRECCIONES", ModCPU.PC
+    Call ModInterfaz.ResaltarBus("DIRECCIONES", ModCPU.PC)
     
     ' 2. Lectura primitiva desde memoria RAM: MDR <- Read(MAR)
     ModCPU.MDR = ModMemoria.Read(ModCPU.MAR)
-    Call ModInterfaz.ResaltarBus "DATOS", ModCPU.MDR
+    Call ModInterfaz.ResaltarBus("DATOS", ModCPU.MDR)
     
     ' 3. Cargar Opcode en el Registro de Instruccion
     ModCPU.IR_Opcode = ModCPU.MDR
@@ -142,11 +142,11 @@ Public Sub Fase_Fetch()
     ModCPU.PC = (ModCPU.PC + 1) And &HFF
     
     ' Resaltar celda del nuevo PC en la matriz
-    Call ModInterfaz.ResaltarCeldaMemoria ModCPU.PC, "PC"
+    Call ModInterfaz.ResaltarCeldaMemoria(ModCPU.PC, "PC")
     
-    Call ModInterfaz.LogMensaje "[FETCH] PC=" & Hex2(pcAnterior) & " -> MAR=" & Hex2(ModCPU.MAR) & _
-                                " | MDR=Read(" & Hex2(ModCPU.MAR) & ")=" & Hex2(ModCPU.MDR) & _
-                                " -> IR_Opcode=" & Hex2(ModCPU.IR_Opcode) & " | PC++ a " & Hex2(ModCPU.PC)
+    Call ModInterfaz.LogMensaje("[FETCH] PC=" & ModMemoria.Hex2(pcAnterior) & " -> MAR=" & ModMemoria.Hex2(ModCPU.MAR) & _
+                                " | MDR=Read(" & ModMemoria.Hex2(ModCPU.MAR) & ")=" & ModMemoria.Hex2(ModCPU.MDR) & _
+                                " -> IR_Opcode=" & ModMemoria.Hex2(ModCPU.IR_Opcode) & " | PC++ a " & ModMemoria.Hex2(ModCPU.PC))
                                 
     ModCPU.NumPasoCiclo = 2
 End Sub
@@ -160,7 +160,7 @@ End Sub
 Public Sub Fase_Decode()
     ModCPU.FaseActual = "DECODE"
     ModCPU.EstadoCPU = "DECODE"
-    Call ModInterfaz.ActualizarFaseUI "DECODE"
+    Call ModInterfaz.ActualizarFaseUI("DECODE")
     
     Dim necesitaSegundoByte As Boolean
     necesitaSegundoByte = RequiereSegundoByte(ModCPU.IR_Opcode)
@@ -175,17 +175,17 @@ Public Sub Fase_Decode()
         pcAnt = ModCPU.PC
         ModCPU.PC = (ModCPU.PC + 1) And &HFF
         
-        Call ModInterfaz.ResaltarCeldaMemoria ModCPU.PC, "PC"
+        Call ModInterfaz.ResaltarCeldaMemoria(ModCPU.PC, "PC")
         
-        Call ModInterfaz.LogMensaje "[DECODE] Opcode 0x" & Hex2(ModCPU.IR_Opcode) & " (" & _
+        Call ModInterfaz.LogMensaje("[DECODE] Opcode 0x" & ModMemoria.Hex2(ModCPU.IR_Opcode) & " (" & _
                                     ModCPU.DesensamblarOpcode(ModCPU.IR_Opcode, ModCPU.IR_Operando) & _
-                                    ") | Operando 2do byte: MAR=0x" & Hex2(ModCPU.MAR) & _
-                                    ", MDR=0x" & Hex2(ModCPU.MDR) & " | PC++ a 0x" & Hex2(ModCPU.PC)
+                                    ") | Operando 2do byte: MAR=0x" & ModMemoria.Hex2(ModCPU.MAR) & _
+                                    ", MDR=0x" & ModMemoria.Hex2(ModCPU.MDR) & " | PC++ a 0x" & ModMemoria.Hex2(ModCPU.PC))
     Else
         ModCPU.IR_Operando = 0
-        Call ModInterfaz.LogMensaje "[DECODE] Opcode 0x" & Hex2(ModCPU.IR_Opcode) & " (" & _
+        Call ModInterfaz.LogMensaje("[DECODE] Opcode 0x" & ModMemoria.Hex2(ModCPU.IR_Opcode) & " (" & _
                                     ModCPU.DesensamblarOpcode(ModCPU.IR_Opcode, 0) & _
-                                    ") | Instruccion de 1 byte (sin operando en RAM)"
+                                    ") | Instruccion de 1 byte (sin operando en RAM)")
     End If
     
     ModCPU.NumPasoCiclo = 3
@@ -200,7 +200,7 @@ End Sub
 Public Sub Fase_Execute()
     ModCPU.FaseActual = "EXECUTE"
     ModCPU.EstadoCPU = "EXECUTE"
-    Call ModInterfaz.ActualizarFaseUI "EXECUTE"
+    Call ModInterfaz.ActualizarFaseUI("EXECUTE")
     
     mCondicionSalto = False
     mResultadoALU = 0
@@ -209,44 +209,44 @@ Public Sub Fase_Execute()
         ' --- CONTROL ---
         Case &H0 ' HLT
             ModCPU.Halted = True
-            Call ModInterfaz.LogMensaje "[EXECUTE] HLT detectado: Deteniendo reloj del CPU."
+            Call ModInterfaz.LogMensaje("[EXECUTE] HLT detectado: Deteniendo reloj del CPU.")
             
         Case &H1 ' NOP
-            Call ModInterfaz.LogMensaje "[EXECUTE] NOP: No operacion."
+            Call ModInterfaz.LogMensaje("[EXECUTE] NOP: No operacion.")
 
         ' --- TRANSFERENCIA DE DATOS (MOV) ---
         Case &H10 ' MOV AX, imm
             mResultadoALU = ModCPU.IR_Operando
-            Call ModInterfaz.LogMensaje "[EXECUTE] MOV: Preparando carga de inmediato 0x" & Hex2(mResultadoALU) & " en AX"
+            Call ModInterfaz.LogMensaje("[EXECUTE] MOV: Preparando carga de inmediato 0x" & ModMemoria.Hex2(mResultadoALU) & " en AX")
             
         Case &H11 ' MOV BX, imm
             mResultadoALU = ModCPU.IR_Operando
-            Call ModInterfaz.LogMensaje "[EXECUTE] MOV: Preparando carga de inmediato 0x" & Hex2(mResultadoALU) & " en BX"
+            Call ModInterfaz.LogMensaje("[EXECUTE] MOV: Preparando carga de inmediato 0x" & ModMemoria.Hex2(mResultadoALU) & " en BX")
             
         Case &H12 ' MOV AX, BX
             mResultadoALU = ModCPU.BX
-            Call ModInterfaz.LogMensaje "[EXECUTE] MOV: Copiando valor de BX (0x" & Hex2(mResultadoALU) & ") hacia AX"
+            Call ModInterfaz.LogMensaje("[EXECUTE] MOV: Copiando valor de BX (0x" & ModMemoria.Hex2(mResultadoALU) & ") hacia AX")
             
         Case &H13 ' MOV BX, AX
             mResultadoALU = ModCPU.AX
-            Call ModInterfaz.LogMensaje "[EXECUTE] MOV: Copiando valor de AX (0x" & Hex2(mResultadoALU) & ") hacia BX"
+            Call ModInterfaz.LogMensaje("[EXECUTE] MOV: Copiando valor de AX (0x" & ModMemoria.Hex2(mResultadoALU) & ") hacia BX")
 
         ' --- ACCESO A MEMORIA (LOAD / STORE) ---
         Case &H20, &H21 ' LOAD AX/BX, [dir]
             ModCPU.MAR = ModCPU.IR_Operando
             ModCPU.MDR = ModMemoria.Read(ModCPU.MAR)
             mResultadoALU = ModCPU.MDR
-            Call ModInterfaz.LogMensaje "[EXECUTE] LOAD: Leyendo RAM[0x" & Hex2(ModCPU.MAR) & "] = 0x" & Hex2(ModCPU.MDR)
+            Call ModInterfaz.LogMensaje("[EXECUTE] LOAD: Leyendo RAM[0x" & ModMemoria.Hex2(ModCPU.MAR) & "] = 0x" & ModMemoria.Hex2(ModCPU.MDR))
             
         Case &H22 ' STORE [dir], AX
             ModCPU.MAR = ModCPU.IR_Operando
             ModCPU.MDR = ModCPU.AX
-            Call ModInterfaz.LogMensaje "[EXECUTE] STORE: Preparando escritura de AX (0x" & Hex2(ModCPU.AX) & ") en RAM[0x" & Hex2(ModCPU.MAR) & "]"
+            Call ModInterfaz.LogMensaje("[EXECUTE] STORE: Preparando escritura de AX (0x" & ModMemoria.Hex2(ModCPU.AX) & ") en RAM[0x" & ModMemoria.Hex2(ModCPU.MAR) & "]")
             
         Case &H23 ' STORE [dir], BX
             ModCPU.MAR = ModCPU.IR_Operando
             ModCPU.MDR = ModCPU.BX
-            Call ModInterfaz.LogMensaje "[EXECUTE] STORE: Preparando escritura de BX (0x" & Hex2(ModCPU.BX) & ") en RAM[0x" & Hex2(ModCPU.MAR) & "]"
+            Call ModInterfaz.LogMensaje("[EXECUTE] STORE: Preparando escritura de BX (0x" & ModMemoria.Hex2(ModCPU.BX) & ") en RAM[0x" & ModMemoria.Hex2(ModCPU.MAR) & "]")
 
         ' --- ARITMETICA Y LOGICA (ALU) ---
         Case &H30: mResultadoALU = ModALU.ALU_Operar("ADD", ModCPU.AX, ModCPU.IR_Operando)
@@ -289,28 +289,28 @@ Public Sub Fase_Execute()
         ' --- CONTROL DE FLUJO (SALTOS) ---
         Case &HA0 ' JMP dir
             mCondicionSalto = True
-            Call ModInterfaz.LogMensaje "[EXECUTE] JMP: Salto incondicional hacia 0x" & Hex2(ModCPU.IR_Operando)
+            Call ModInterfaz.LogMensaje("[EXECUTE] JMP: Salto incondicional hacia 0x" & ModMemoria.Hex2(ModCPU.IR_Operando))
             
         Case &HA1 ' JZ dir (Salto si Zero=1)
             If ModCPU.ZF = 1 Then
                 mCondicionSalto = True
-                Call ModInterfaz.LogMensaje "[EXECUTE] JZ: Condicion cumplida (ZF=1). Bifurcando hacia 0x" & Hex2(ModCPU.IR_Operando)
+                Call ModInterfaz.LogMensaje("[EXECUTE] JZ: Condicion cumplida (ZF=1). Bifurcando hacia 0x" & ModMemoria.Hex2(ModCPU.IR_Operando))
             Else
                 mCondicionSalto = False
-                Call ModInterfaz.LogMensaje "[EXECUTE] JZ: Condicion no cumplida (ZF=0). No salta."
+                Call ModInterfaz.LogMensaje("[EXECUTE] JZ: Condicion no cumplida (ZF=0). No salta.")
             End If
             
         Case &HA2 ' JNZ dir (Salto si Zero=0)
             If ModCPU.ZF = 0 Then
                 mCondicionSalto = True
-                Call ModInterfaz.LogMensaje "[EXECUTE] JNZ: Condicion cumplida (ZF=0). Bifurcando hacia 0x" & Hex2(ModCPU.IR_Operando)
+                Call ModInterfaz.LogMensaje("[EXECUTE] JNZ: Condicion cumplida (ZF=0). Bifurcando hacia 0x" & ModMemoria.Hex2(ModCPU.IR_Operando))
             Else
                 mCondicionSalto = False
-                Call ModInterfaz.LogMensaje "[EXECUTE] JNZ: Condicion no cumplida (ZF=1). No salta."
+                Call ModInterfaz.LogMensaje("[EXECUTE] JNZ: Condicion no cumplida (ZF=1). No salta.")
             End If
             
         Case Else
-            Call ModInterfaz.LogMensaje "[EXECUTE] Opcode no implementado: 0x" & Hex2(ModCPU.IR_Opcode)
+            Call ModInterfaz.LogMensaje("[EXECUTE] Opcode no implementado: 0x" & ModMemoria.Hex2(ModCPU.IR_Opcode))
     End Select
     
     ModCPU.NumPasoCiclo = 4
@@ -319,53 +319,53 @@ End Sub
 ''' <summary>
 ''' FASE 4: STORE / WRITE-BACK (Almacenamiento)
 '''  - El resultado se guarda en el registro destino (AX, BX).
-'''  - O se escribe en la memoria RAM via la primitiva Write(MAR, MDR).
+'''  - O se escribe en la memoria RAM via la primitiva MemWrite(MAR, MDR).
 '''  - O se actualiza el PC en caso de salto efectivo.
 '''  - Concluye la instruccion y prepara el siguiente ciclo.
 ''' </summary>
 Public Sub Fase_Store()
     ModCPU.FaseActual = "STORE"
     ModCPU.EstadoCPU = "STORE"
-    Call ModInterfaz.ActualizarFaseUI "STORE"
+    Call ModInterfaz.ActualizarFaseUI("STORE")
     
     Select Case ModCPU.IR_Opcode
         ' Escritura en Registro AX
         Case &H10, &H12, &H20, &H30, &H32, &H40, &H42, &H60, &H62, &H64, &H70, &H72, &H80, &H82, &H90, &H92
             ModCPU.AX = mResultadoALU
-            Call ModInterfaz.LogMensaje "[STORE] Registro AX <- 0x" & Hex2(ModCPU.AX)
+            Call ModInterfaz.LogMensaje("[STORE] Registro AX <- 0x" & ModMemoria.Hex2(ModCPU.AX))
             
         ' Escritura en Registro BX
         Case &H11, &H13, &H21, &H31, &H33, &H41, &H43, &H61, &H63, &H65, &H71, &H73, &H81, &H83, &H91, &H93
             ModCPU.BX = mResultadoALU
-            Call ModInterfaz.LogMensaje "[STORE] Registro BX <- 0x" & Hex2(ModCPU.BX)
+            Call ModInterfaz.LogMensaje("[STORE] Registro BX <- 0x" & ModMemoria.Hex2(ModCPU.BX))
             
-        ' Escritura en Memoria RAM via Primitiva Write()
+        ' Escritura en Memoria RAM via Primitiva MemWrite()
         Case &H22, &H23
-            Call ModMemoria.Write(ModCPU.MAR, CByte(ModCPU.MDR))
-            Call ModInterfaz.LogMensaje "[STORE] Write(0x" & Hex2(ModCPU.MAR) & ", 0x" & Hex2(ModCPU.MDR) & ") completado en RAM."
+            Call ModMemoria.MemWrite(ModCPU.MAR, CByte(ModCPU.MDR))
+            Call ModInterfaz.LogMensaje("[STORE] Write(0x" & ModMemoria.Hex2(ModCPU.MAR) & ", 0x" & ModMemoria.Hex2(ModCPU.MDR) & ") completado en RAM.")
             
         ' Actualizacion de PC por Salto
         Case &HA0, &HA1, &HA2
             If mCondicionSalto Then
                 ModCPU.PC = ModCPU.IR_Operando
-                Call ModInterfaz.ResaltarCeldaMemoria ModCPU.PC, "PC"
-                Call ModInterfaz.LogMensaje "[STORE] Salto efectuado: PC actualizado a 0x" & Hex2(ModCPU.PC)
+                Call ModInterfaz.ResaltarCeldaMemoria(ModCPU.PC, "PC")
+                Call ModInterfaz.LogMensaje("[STORE] Salto efectuado: PC actualizado a 0x" & ModMemoria.Hex2(ModCPU.PC))
             Else
-                Call ModInterfaz.LogMensaje "[STORE] No hubo salto: PC continua en 0x" & Hex2(ModCPU.PC)
+                Call ModInterfaz.LogMensaje("[STORE] No hubo salto: PC continua en 0x" & ModMemoria.Hex2(ModCPU.PC))
             End If
             
         ' Instrucciones que no modifican registros ni RAM (CMP, HLT, NOP)
         Case &H50, &H51, &H52, &H53
-            Call ModInterfaz.LogMensaje "[STORE] CMP: Solo banderas actualizadas. Registros intactos."
+            Call ModInterfaz.LogMensaje("[STORE] CMP: Solo banderas actualizadas. Registros intactos.")
             
         Case &H0
-            Call ModInterfaz.LogMensaje "[STORE] Fin de programa (HLT)."
+            Call ModInterfaz.LogMensaje("[STORE] Fin de programa (HLT).")
     End Select
     
     ModCPU.ContadorInstrucciones = ModCPU.ContadorInstrucciones + 1
     
     ' Resalta en el editor la linea correspondiente a la siguiente instruccion
-    Call ModInterfaz.ResaltarLineaEditor ModCPU.PC
+    Call ModInterfaz.ResaltarLineaEditor(ModCPU.PC)
     
     ' Vuelve a la Fase 1 (Fetch) para la siguiente instruccion
     ModCPU.NumPasoCiclo = 1
@@ -397,11 +397,15 @@ Public Function ObtenerRetardo() As Double
     Dim ws As Worksheet
     Dim valVel As Long
     On Error Resume Next
-    Set ws = ThisWorkbook.Worksheets("Simulador")
+    Set ws = ModInterfaz.HojaSim()
+    If ws Is Nothing Then
+        ObtenerRetardo = 0.3
+        Exit Function
+    End If
     valVel = CLng(ws.Range("E30").Value)  ' Celda con valor de velocidad (1 a 5)
     If valVel <= 0 Then valVel = 3
     
-    ' Velocidad 1: 0.8s, Velocidad 3: 0.3s, Velocidad 5: 0.05s
+    ' Velocidad 1: 0.8s, Velocidad 2: 0.5s, Velocidad 3: 0.3s, Velocidad 4: 0.15s, Velocidad 5: 0.05s
     Select Case valVel
         Case 1: ObtenerRetardo = 0.8
         Case 2: ObtenerRetardo = 0.5
@@ -416,6 +420,8 @@ Public Sub DormirMs(ByVal segundos As Double)
     Dim tInicio As Double
     tInicio = Timer
     Do While Timer < tInicio + segundos
+        If Timer < tInicio Then Exit Do ' Control de medianoche
+        If ModCPU.SolicitarPausa Or ModCPU.Halted Then Exit Do
         DoEvents
     Loop
 End Sub

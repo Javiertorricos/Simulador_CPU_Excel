@@ -49,15 +49,16 @@ Public Function Read(ByVal address As Long) As Byte
     UltimaOpMem = "Read(0x" & Hex2(addrValida) & ") -> 0x" & Hex2(Read)
     
     ' Reflejar acceso en panel de primitivas de la hoja
-    Call ModInterfaz.ActualizarPanelPrimitivas "READ", addrValida, CLng(Read)
-    Call ModInterfaz.ResaltarCeldaMemoria addrValida, "LECTURA"
+    Call ModInterfaz.ActualizarPanelPrimitivas("READ", addrValida, CLng(Read))
+    Call ModInterfaz.ResaltarCeldaMemoria(addrValida, "LECTURA")
 End Function
 
 ''' <summary>
-''' Subrutina primitiva de escritura de memoria: Write(address, value).
-''' Escribe un byte en la direccion especificada de la RAM y actualiza la hoja.
+''' Subrutina primitiva de escritura de memoria: MemWrite(address, value).
+''' NOTA: "Write" es palabra reservada en VBA (instruccion Write #).
+''' Se implementa como MemWrite / WriteRAM para compatibilidad total.
 ''' </summary>
-Public Sub Write(ByVal address As Long, ByVal value As Byte)
+Public Sub MemWrite(ByVal address As Long, ByVal value As Byte)
     Dim addrValida As Long
     Dim valByte As Byte
     addrValida = address And &HFF
@@ -75,8 +76,12 @@ Public Sub Write(ByVal address As Long, ByVal value As Byte)
     Call ModMemoria.Memoria_ActualizarCeldaUI(addrValida)
     
     ' Reflejar acceso en panel de primitivas de la hoja
-    Call ModInterfaz.ActualizarPanelPrimitivas "WRITE", addrValida, CLng(valByte)
-    Call ModInterfaz.ResaltarCeldaMemoria addrValida, "ESCRITURA"
+    Call ModInterfaz.ActualizarPanelPrimitivas("WRITE", addrValida, CLng(valByte))
+    Call ModInterfaz.ResaltarCeldaMemoria(addrValida, "ESCRITURA")
+End Sub
+
+Public Sub WriteRAM(ByVal address As Long, ByVal value As Byte)
+    Call MemWrite(address, value)
 End Sub
 
 ' ==============================================================================
@@ -95,7 +100,7 @@ Public Sub Memoria_Reset()
     UltimoTipoMem = ""
     UltimaOpMem = "Memoria inicializada en 00h"
     Call Memoria_RefrescarTodaUI
-    Call ModInterfaz.ActualizarPanelPrimitivas "LISTO", 0, 0
+    Call ModInterfaz.ActualizarPanelPrimitivas("LISTO", 0, 0)
 End Sub
 
 ''' <summary>
@@ -120,7 +125,9 @@ Public Sub Memoria_ActualizarCeldaUI(ByVal dir As Long)
     Dim filaOffset As Long, colOffset As Long
     Dim f As Long, c As Long
     
-    Set ws = ThisWorkbook.Worksheets("Simulador")
+    Set ws = ModInterfaz.HojaSim()
+    If ws Is Nothing Then Exit Sub
+    
     f = (dir \ 16)   ' Fila 0..15 (nibble alto)
     c = (dir Mod 16) ' Columna 0..15 (nibble bajo)
     
@@ -128,6 +135,7 @@ Public Sub Memoria_ActualizarCeldaUI(ByVal dir As Long)
     filaOffset = 6 + f
     colOffset = 18 + c
     
+    ws.Cells(filaOffset, colOffset).NumberFormat = "@"
     ws.Cells(filaOffset, colOffset).Value = Hex2(MemRAM(dir))
 End Sub
 
@@ -139,7 +147,8 @@ Public Sub Memoria_RefrescarTodaUI()
     Dim f As Long, c As Long, dir As Long
     Dim matrizValores(1 To 16, 1 To 16) As Variant
     
-    Set ws = ThisWorkbook.Worksheets("Simulador")
+    Set ws = ModInterfaz.HojaSim()
+    If ws Is Nothing Then Exit Sub
     
     For f = 0 To 15
         For c = 0 To 15
@@ -149,6 +158,7 @@ Public Sub Memoria_RefrescarTodaUI()
     Next f
     
     ' Escritura en bloque para maxima velocidad y fluidez
+    ws.Range("R6:AG21").NumberFormat = "@"
     ws.Range("R6:AG21").Value = matrizValores
 End Sub
 
@@ -159,7 +169,7 @@ Public Sub Memoria_Inspeccionar(ByVal dir As Long)
     Dim val As Long
     dir = dir And &HFF
     val = MemRAM(dir)
-    Call ModInterfaz.MostrarInspectorMemoria dir, val
+    Call ModInterfaz.MostrarInspectorMemoria(dir, val)
 End Sub
 
 ' ==============================================================================

@@ -20,7 +20,7 @@ Option Explicit
 Private mUltimaCeldaRAM As Range
 Private mUltimaFilaEditor As Long
 
-Private Function HojaSim() As Worksheet
+Public Function HojaSim() As Worksheet
     On Error Resume Next
     Set HojaSim = ThisWorkbook.Worksheets("Simulador")
     If HojaSim Is Nothing Then Set HojaSim = ActiveWorkbook.Worksheets("Simulador")
@@ -55,7 +55,7 @@ Public Sub Btn_Reset()
     Call ModCPU.CPU_Reset
     Call ModMemoria.Memoria_Reset
     Call ModInterfaz.RestaurarColoresEditor
-    Call ModInterfaz.LogMensaje "SIMULADOR REINICIADO POR COMPLETO (Memoria y Registros a 00h)."
+    Call ModInterfaz.LogMensaje("SIMULADOR REINICIADO POR COMPLETO (Memoria y Registros a 00h).")
 End Sub
 
 Public Sub Btn_Ejemplo1(): Call ModEnsamblador.CargarProgramaDemo(1): End Sub

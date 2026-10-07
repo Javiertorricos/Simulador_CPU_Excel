@@ -120,5 +120,5 @@ Public Function ALU_Operar(ByVal op As String, ByVal valA As Long, ByVal valB As
     ALU_Operar = res8
     
     ' Mostrar calculo en el panel ALU de la hoja
-    Call ModInterfaz.ActualizarPanelALU UltimaOpALU, res8
+    Call ModInterfaz.ActualizarPanelALU(UltimaOpALU, res8)
 End Function

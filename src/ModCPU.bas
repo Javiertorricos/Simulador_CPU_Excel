@@ -64,8 +64,8 @@ Public Sub CPU_Reset()
     
     ' Refrescar interfaz visual
     Call CPU_ActualizarUI
-    Call ModInterfaz.ActualizarFaseUI "LISTO"
-    Call ModInterfaz.LogMensaje "CPU reiniciado: PC=00h, Registros=00h, Banderas=0"
+    Call ModInterfaz.ActualizarFaseUI("LISTO")
+    Call ModInterfaz.LogMensaje("CPU reiniciado: PC=00h, Registros=00h, Banderas=0")
 End Sub
 
 ''' <summary>
@@ -74,34 +74,29 @@ End Sub
 Public Sub CPU_ActualizarUI()
     On Error Resume Next
     Dim ws As Worksheet
-    Set ws = ThisWorkbook.Worksheets("Simulador")
-    If ws Is Nothing Then Set ws = ActiveWorkbook.Worksheets("Simulador")
+    Set ws = ModInterfaz.HojaSim()
     If ws Is Nothing Then Exit Sub
     
-    ' Registros Principales (Hexadecimal, Decimal y Binario)
-    ' PC: H8 (Hex), H9 (Dec/Bin)
-    ws.Range("H8").Value = "0x" & Hex2(PC)
-    ws.Range("H9").Value = PC & " (" & Bin8(PC) & ")"
+    ' Registros Principales (Hexadecimal) - Se respetan las etiquetas descriptivas de la fila 9
+    ' PC: H8 (Hex)
+    ws.Range("H8").Value = "0x" & ModMemoria.Hex2(PC)
     
-    ' IR: J8 (Opcode Hex + Mnem), J9 (Operando)
-    ws.Range("J8").Value = "0x" & Hex2(IR_Opcode) & " [" & DesensamblarOpcode(IR_Opcode, IR_Operando) & "]"
-    ws.Range("J9").Value = "Arg: 0x" & Hex2(IR_Operando) & " (" & IR_Operando & ")"
+    ' IR: J8 (Opcode Hex + Mnem)
+    ws.Range("J8").Value = "0x" & ModMemoria.Hex2(IR_Opcode) & " [" & DesensamblarOpcode(IR_Opcode, IR_Operando) & "]"
     
-    ' MAR: L8 (Hex), L9 (Dec)
-    ws.Range("L8").Value = "0x" & Hex2(MAR)
-    ws.Range("L9").Value = MAR & "d"
+    ' MAR: L8 (Hex)
+    ws.Range("L8").Value = "0x" & ModMemoria.Hex2(MAR)
     
-    ' MDR: N8 (Hex), N9 (Dec/Bin)
-    ws.Range("N8").Value = "0x" & Hex2(MDR)
-    ws.Range("N9").Value = MDR & " (" & Bin8(MDR) & ")"
+    ' MDR: N8 (Hex)
+    ws.Range("N8").Value = "0x" & ModMemoria.Hex2(MDR)
     
     ' AX (Acumulador): H12 (Hex), H13 (Dec/Bin)
-    ws.Range("H12").Value = "0x" & Hex2(AX)
-    ws.Range("H13").Value = AX & " (" & Bin8(AX) & ")"
+    ws.Range("H12").Value = "0x" & ModMemoria.Hex2(AX)
+    ws.Range("H13").Value = AX & " (" & ModMemoria.Bin8(AX) & "b)"
     
     ' BX: J12 (Hex), J13 (Dec/Bin)
-    ws.Range("J12").Value = "0x" & Hex2(BX)
-    ws.Range("J13").Value = BX & " (" & Bin8(BX) & ")"
+    ws.Range("J12").Value = "0x" & ModMemoria.Hex2(BX)
+    ws.Range("J13").Value = BX & " (" & ModMemoria.Bin8(BX) & "b)"
     
     ' Banderas de Estado (Flags): L12, M12, N12
     ws.Range("L12").Value = ZF
@@ -109,12 +104,12 @@ Public Sub CPU_ActualizarUI()
     ws.Range("N12").Value = SF
     
     ' Formato visual de las banderas (ilumina en verde si es 1, gris si es 0)
-    Call ModInterfaz.ActualizarFlagsUI ZF, CF, SF
+    Call ModInterfaz.ActualizarFlagsUI(ZF, CF, SF)
     
-    ' Contadores de estado: P8 (Ciclos), P9 (Instrucciones), P12 (Estado)
-    ws.Range("P8").Value = ContadorCiclos
-    ws.Range("P9").Value = ContadorInstrucciones
-    ws.Range("P12").Value = EstadoCPU
+    ' Contadores de estado: P8 (Ciclos), P9 (Instrucciones), O12 (Estado CPU celda combinada O12:P12)
+    ws.Range("P8").Value = ContadorCiclos & " Ciclos"
+    ws.Range("P9").Value = ContadorInstrucciones & " Instr."
+    ws.Range("O12").Value = EstadoCPU
 End Sub
 
 ''' <summary>

@@ -10,7 +10,7 @@ Option Explicit
 '  MODULO: ModEnsamblador
 '  Descripcion:
 '    Ensamblador de 2 pasadas integrado en Excel.
-'    Traduce codigo mnemónico en lenguaje ensamblador a codigo maquina binario (opcodes y operandos),
+'    Traduce codigo mnemonico en lenguaje ensamblador a codigo maquina binario (opcodes y operandos),
 '    los carga directamente en la Memoria RAM (posiciones 00h en adelante) y
 '    proporciona los 4 programas demostrativos requeridos por el enunciado del Parcial.
 ' ==============================================================================
@@ -35,7 +35,8 @@ Public Sub Ensamblar_DesdeHoja()
     Dim lineas(1 To 30) As String
     Dim numLineas As Long
     
-    Set ws = ThisWorkbook.Worksheets("Simulador")
+    Set ws = ModInterfaz.HojaSim()
+    If ws Is Nothing Then Exit Sub
     numLineas = 0
     
     ' Leer lineas no vacias del editor (Columna C: Codigo ASM)
@@ -45,18 +46,19 @@ Public Sub Ensamblar_DesdeHoja()
             numLineas = numLineas + 1
             lineas(numLineas) = linea
         Else
-            ' Limpiar columnas de Dir y Bytes en la fila vacia
+            ' Limpiar columnas de Dir, Bytes y Operacion en la fila vacia
             ws.Cells(fila, 2).Value = ""
             ws.Cells(fila, 4).Value = ""
+            ws.Cells(fila, 5).Value = ""
         End If
     Next fila
     
     If numLineas = 0 Then
-        Call ModInterfaz.LogMensaje "AVISO: El editor de codigo esta vacio."
+        Call ModInterfaz.LogMensaje("AVISO: El editor de codigo esta vacio.")
         Exit Sub
     End If
     
-    ' Reiniciar memoria RAM a 0
+    ' Reiniciar memoria RAM a 0 y registros de CPU
     Call ModMemoria.Memoria_Reset
     Call ModCPU.CPU_Reset
     
@@ -116,6 +118,15 @@ Public Sub Ensamblar_DesdeHoja()
             Dim b1 As Byte, b2 As Byte, cantB As Long
             cantB = CodificarInstruccion(linea, dirActual, b1, b2)
             
+            ' Nombre de la operacion para la columna E
+            Dim opName As String
+            If InStr(Trim$(linea), " ") > 0 Then
+                opName = UCase$(Trim$(Left$(Trim$(linea), InStr(Trim$(linea), " ") - 1)))
+            Else
+                opName = UCase$(Trim$(linea))
+            End If
+            ws.Cells(filaUI, 5).Value = opName
+            
             If cantB = 1 Then
                 ModMemoria.MemRAM(dirActual) = b1
                 ws.Cells(filaUI, 4).Value = ModMemoria.Hex2(b1)
@@ -128,6 +139,7 @@ Public Sub Ensamblar_DesdeHoja()
             End If
         Else
             ws.Cells(filaUI, 4).Value = ""
+            ws.Cells(filaUI, 5).Value = "ETIQ"
         End If
         
         filaUI = filaUI + 1
@@ -135,10 +147,10 @@ Public Sub Ensamblar_DesdeHoja()
     
     ' Refrescar memoria visual
     Call ModMemoria.Memoria_RefrescarTodaUI
-    Call ModInterfaz.ResaltarCeldaMemoria 0, "PC"
-    Call ModInterfaz.ResaltarLineaEditor 0
+    Call ModInterfaz.ResaltarCeldaMemoria(0, "PC")
+    Call ModInterfaz.ResaltarLineaEditor(0)
     
-    Call ModInterfaz.LogMensaje "PROGRAMA ENSAMBLADO Y CARGADO: " & dirActual & " bytes en Segmento de Codigo (00h a " & ModMemoria.Hex2(dirActual - 1) & "h)."
+    Call ModInterfaz.LogMensaje("PROGRAMA ENSAMBLADO Y CARGADO: " & dirActual & " bytes en Segmento de Codigo (00h a " & ModMemoria.Hex2(dirActual - 1) & "h).")
 End Sub
 
 ''' <summary>
@@ -159,7 +171,9 @@ Private Function CalcularBytesInstruccion(ByVal linea As String) As Long
         Case "LOAD", "STORE": CalcularBytesInstruccion = 2
         Case "MOV", "ADD", "SUB", "CMP", "AND", "OR", "XOR":
             ' Si ambos operandos son registros es 1 byte, sino 2 bytes
-            If InStr(UCase$(linea), "AX, BX") > 0 Or InStr(UCase$(linea), "BX, AX") > 0 Then
+            Dim uLine As String
+            uLine = Replace(UCase$(linea), " ", "")
+            If InStr(uLine, "AX,BX") > 0 Or InStr(uLine, "BX,AX") > 0 Then
                 CalcularBytesInstruccion = 1
             Else
                 CalcularBytesInstruccion = 2
@@ -172,35 +186,38 @@ End Function
 ''' Codifica una linea ensamblador a bytes binarios.
 ''' </summary>
 Private Function CodificarInstruccion(ByVal linea As String, ByVal dirActual As Long, ByRef outB1 As Byte, ByRef outB2 As Byte) As Long
-    Dim s As String
+    Dim s As String, sSinEspacios As String
     s = UCase$(Trim$(linea))
+    sSinEspacios = Replace(s, " ", "")
     outB1 = 0: outB2 = 0
     
-    ' Instrucciones simples de 1 byte
+    ' Instrucciones simples de 1 byte sin operandos
     If s = "HLT" Then outB1 = &H0: CodificarInstruccion = 1: Exit Function
     If s = "NOP" Then outB1 = &H1: CodificarInstruccion = 1: Exit Function
     
-    If s = "INC AX" Then outB1 = &H60: CodificarInstruccion = 1: Exit Function
-    If s = "INC BX" Then outB1 = &H61: CodificarInstruccion = 1: Exit Function
-    If s = "DEC AX" Then outB1 = &H62: CodificarInstruccion = 1: Exit Function
-    If s = "DEC BX" Then outB1 = &H63: CodificarInstruccion = 1: Exit Function
-    If s = "NOT AX" Then outB1 = &H64: CodificarInstruccion = 1: Exit Function
-    If s = "NOT BX" Then outB1 = &H65: CodificarInstruccion = 1: Exit Function
+    ' Operaciones unarias (1 byte)
+    If sSinEspacios = "INCAX" Then outB1 = &H60: CodificarInstruccion = 1: Exit Function
+    If sSinEspacios = "INCBX" Then outB1 = &H61: CodificarInstruccion = 1: Exit Function
+    If sSinEspacios = "DECAX" Then outB1 = &H62: CodificarInstruccion = 1: Exit Function
+    If sSinEspacios = "DECBX" Then outB1 = &H63: CodificarInstruccion = 1: Exit Function
+    If sSinEspacios = "NOTAX" Then outB1 = &H64: CodificarInstruccion = 1: Exit Function
+    If sSinEspacios = "NOTBX" Then outB1 = &H65: CodificarInstruccion = 1: Exit Function
     
-    If s = "MOV AX, BX" Then outB1 = &H12: CodificarInstruccion = 1: Exit Function
-    If s = "MOV BX, AX" Then outB1 = &H13: CodificarInstruccion = 1: Exit Function
-    If s = "ADD AX, BX" Then outB1 = &H32: CodificarInstruccion = 1: Exit Function
-    If s = "ADD BX, AX" Then outB1 = &H33: CodificarInstruccion = 1: Exit Function
-    If s = "SUB AX, BX" Then outB1 = &H42: CodificarInstruccion = 1: Exit Function
-    If s = "SUB BX, AX" Then outB1 = &H43: CodificarInstruccion = 1: Exit Function
-    If s = "CMP AX, BX" Then outB1 = &H52: CodificarInstruccion = 1: Exit Function
-    If s = "CMP BX, AX" Then outB1 = &H53: CodificarInstruccion = 1: Exit Function
-    If s = "AND AX, BX" Then outB1 = &H72: CodificarInstruccion = 1: Exit Function
-    If s = "AND BX, AX" Then outB1 = &H73: CodificarInstruccion = 1: Exit Function
-    If s = "OR AX, BX" Then outB1 = &H82: CodificarInstruccion = 1: Exit Function
-    If s = "OR BX, AX" Then outB1 = &H83: CodificarInstruccion = 1: Exit Function
-    If s = "XOR AX, BX" Then outB1 = &H92: CodificarInstruccion = 1: Exit Function
-    If s = "XOR BX, AX" Then outB1 = &H93: CodificarInstruccion = 1: Exit Function
+    ' Operaciones registro a registro (1 byte)
+    If sSinEspacios = "MOVAX,BX" Then outB1 = &H12: CodificarInstruccion = 1: Exit Function
+    If sSinEspacios = "MOVBX,AX" Then outB1 = &H13: CodificarInstruccion = 1: Exit Function
+    If sSinEspacios = "ADDAX,BX" Then outB1 = &H32: CodificarInstruccion = 1: Exit Function
+    If sSinEspacios = "ADDBX,AX" Then outB1 = &H33: CodificarInstruccion = 1: Exit Function
+    If sSinEspacios = "SUBAX,BX" Then outB1 = &H42: CodificarInstruccion = 1: Exit Function
+    If sSinEspacios = "SUBBX,AX" Then outB1 = &H43: CodificarInstruccion = 1: Exit Function
+    If sSinEspacios = "CMPAX,BX" Then outB1 = &H52: CodificarInstruccion = 1: Exit Function
+    If sSinEspacios = "CMPBX,AX" Then outB1 = &H53: CodificarInstruccion = 1: Exit Function
+    If sSinEspacios = "ANDAX,BX" Then outB1 = &H72: CodificarInstruccion = 1: Exit Function
+    If sSinEspacios = "ANDBX,AX" Then outB1 = &H73: CodificarInstruccion = 1: Exit Function
+    If sSinEspacios = "ORAX,BX" Then outB1 = &H82: CodificarInstruccion = 1: Exit Function
+    If sSinEspacios = "ORBX,AX" Then outB1 = &H83: CodificarInstruccion = 1: Exit Function
+    If sSinEspacios = "XORAX,BX" Then outB1 = &H92: CodificarInstruccion = 1: Exit Function
+    If sSinEspacios = "XORBX,AX" Then outB1 = &H93: CodificarInstruccion = 1: Exit Function
     
     ' Instrucciones con operando de 2 bytes
     Dim mnem As String, resto As String
@@ -240,13 +257,17 @@ Private Function CodificarInstruccion(ByVal linea As String, ByVal dirActual As 
     Select Case mnem
         Case "MOV"
             If op1 = "AX" Then
-                If Left$(op2, 1) = "[" Then
+                If op2 = "BX" Then
+                    outB1 = &H12: CodificarInstruccion = 1: Exit Function
+                ElseIf Left$(op2, 1) = "[" Then
                     outB1 = &H20: outB2 = CByte(ExtraerDir(op2))
                 Else
                     outB1 = &H10: outB2 = CByte(ResolverValor(op2))
                 End If
             ElseIf op1 = "BX" Then
-                If Left$(op2, 1) = "[" Then
+                If op2 = "AX" Then
+                    outB1 = &H13: CodificarInstruccion = 1: Exit Function
+                ElseIf Left$(op2, 1) = "[" Then
                     outB1 = &H21: outB2 = CByte(ExtraerDir(op2))
                 Else
                     outB1 = &H11: outB2 = CByte(ResolverValor(op2))
@@ -274,36 +295,48 @@ Private Function CodificarInstruccion(ByVal linea As String, ByVal dirActual As 
             Exit Function
             
         Case "ADD"
+            If op1 = "AX" And op2 = "BX" Then outB1 = &H32: CodificarInstruccion = 1: Exit Function
+            If op1 = "BX" And op2 = "AX" Then outB1 = &H33: CodificarInstruccion = 1: Exit Function
             If op1 = "AX" Then outB1 = &H30 Else outB1 = &H31
             outB2 = CByte(ResolverValor(op2))
             CodificarInstruccion = 2
             Exit Function
             
         Case "SUB"
+            If op1 = "AX" And op2 = "BX" Then outB1 = &H42: CodificarInstruccion = 1: Exit Function
+            If op1 = "BX" And op2 = "AX" Then outB1 = &H43: CodificarInstruccion = 1: Exit Function
             If op1 = "AX" Then outB1 = &H40 Else outB1 = &H41
             outB2 = CByte(ResolverValor(op2))
             CodificarInstruccion = 2
             Exit Function
             
         Case "CMP"
+            If op1 = "AX" And op2 = "BX" Then outB1 = &H52: CodificarInstruccion = 1: Exit Function
+            If op1 = "BX" And op2 = "AX" Then outB1 = &H53: CodificarInstruccion = 1: Exit Function
             If op1 = "AX" Then outB1 = &H50 Else outB1 = &H51
             outB2 = CByte(ResolverValor(op2))
             CodificarInstruccion = 2
             Exit Function
             
         Case "AND"
+            If op1 = "AX" And op2 = "BX" Then outB1 = &H72: CodificarInstruccion = 1: Exit Function
+            If op1 = "BX" And op2 = "AX" Then outB1 = &H73: CodificarInstruccion = 1: Exit Function
             If op1 = "AX" Then outB1 = &H70 Else outB1 = &H71
             outB2 = CByte(ResolverValor(op2))
             CodificarInstruccion = 2
             Exit Function
             
         Case "OR"
+            If op1 = "AX" And op2 = "BX" Then outB1 = &H82: CodificarInstruccion = 1: Exit Function
+            If op1 = "BX" And op2 = "AX" Then outB1 = &H83: CodificarInstruccion = 1: Exit Function
             If op1 = "AX" Then outB1 = &H80 Else outB1 = &H81
             outB2 = CByte(ResolverValor(op2))
             CodificarInstruccion = 2
             Exit Function
             
         Case "XOR"
+            If op1 = "AX" And op2 = "BX" Then outB1 = &H92: CodificarInstruccion = 1: Exit Function
+            If op1 = "BX" And op2 = "AX" Then outB1 = &H93: CodificarInstruccion = 1: Exit Function
             If op1 = "AX" Then outB1 = &H90 Else outB1 = &H91
             outB2 = CByte(ResolverValor(op2))
             CodificarInstruccion = 2
@@ -331,7 +364,7 @@ Private Function ResolverValor(ByVal s As String) As Long
     Next k
     
     ' Formato hexadecimal: "0x.." o "..H"
-    If Left$(s, 2) = "0X" Or Left$(s, 2) = "0x" Then
+    If Left$(UCase$(s), 2) = "0X" Then
         ResolverValor = Val("&H" & Mid$(s, 3))
     ElseIf Right$(UCase$(s), 1) = "H" Then
         ResolverValor = Val("&H" & Left$(s, Len(s) - 1))
@@ -355,21 +388,22 @@ End Function
 
 Public Sub CargarProgramaDemo(ByVal opcion As Long)
     Dim ws As Worksheet
-    Set ws = ThisWorkbook.Worksheets("Simulador")
+    Set ws = ModInterfaz.HojaSim()
+    If ws Is Nothing Then Exit Sub
     
-    ' Limpiar editor
+    ' Limpiar editor (Columnas B a F, filas 7 a 26)
     ws.Range("B7:F26").ClearContents
     
     Select Case opcion
         Case 1 ' MULTIPLICACION POR SUMAS SUCESIVAS: 6 * 7 = 42 (2Ah)
-            ws.Cells(7, 3).Value = "MOV AX, 0":      ws.Cells(7, 6).Value = "Inicializa acumulador de producto en 0"
-            ws.Cells(8, 3).Value = "MOV BX, 7":      ws.Cells(8, 6).Value = "Contador de multiplicacion (multiplicador = 7)"
-            ws.Cells(9, 3).Value = "BUCLE:":         ws.Cells(9, 6).Value = "Etiqueta de inicio del ciclo"
-            ws.Cells(10, 3).Value = "ADD AX, 6":     ws.Cells(10, 6).Value = "Suma sucesiva del multiplicando (6)"
-            ws.Cells(11, 3).Value = "DEC BX":        ws.Cells(11, 6).Value = "Decrementa contador"
-            ws.Cells(12, 3).Value = "JNZ BUCLE":     ws.Cells(12, 6).Value = "Bifurca si BX != 0 (ZF=0)"
+            ws.Cells(7, 3).Value = "MOV AX, 0":        ws.Cells(7, 6).Value = "Inicializa acumulador de producto en 0"
+            ws.Cells(8, 3).Value = "MOV BX, 7":        ws.Cells(8, 6).Value = "Contador de multiplicacion (multiplicador = 7)"
+            ws.Cells(9, 3).Value = "BUCLE:":           ws.Cells(9, 6).Value = "Etiqueta de inicio del ciclo"
+            ws.Cells(10, 3).Value = "ADD AX, 6":       ws.Cells(10, 6).Value = "Suma sucesiva del multiplicando (6)"
+            ws.Cells(11, 3).Value = "DEC BX":          ws.Cells(11, 6).Value = "Decrementa contador"
+            ws.Cells(12, 3).Value = "JNZ BUCLE":       ws.Cells(12, 6).Value = "Bifurca si BX != 0 (ZF=0)"
             ws.Cells(13, 3).Value = "STORE [80h], AX": ws.Cells(13, 6).Value = "Guarda resultado 42 (2Ah) en Segmento de Datos"
-            ws.Cells(14, 3).Value = "HLT":           ws.Cells(14, 6).Value = "Detiene el reloj del CPU"
+            ws.Cells(14, 3).Value = "HLT":             ws.Cells(14, 6).Value = "Detiene el reloj del CPU"
 
         Case 2 ' SERIE DE FIBONACCI (Generacion de primeros terminos)
             ws.Cells(7, 3).Value = "MOV AX, 1":        ws.Cells(7, 6).Value = "Primer termino F0 = 1"
@@ -385,22 +419,22 @@ Public Sub CargarProgramaDemo(ByVal opcion As Long)
             ws.Cells(17, 3).Value = "HLT":             ws.Cells(17, 6).Value = "Fin de generacion"
 
         Case 3 ' FACTORIAL DE UN ENTERO (Factorial de 4 = 24 = 18h)
-            ws.Cells(7, 3).Value = "MOV AX, 1":      ws.Cells(7, 6).Value = "Producto acumulado = 1"
-            ws.Cells(8, 3).Value = "MOV BX, 4":      ws.Cells(8, 6).Value = "Contador de factorial N = 4"
-            ws.Cells(9, 3).Value = "STORE [80h], AX": ws.Cells(9, 6).Value = "Guarda factor actual en RAM"
-            ws.Cells(10, 3).Value = "ADD AX, AX":    ws.Cells(10, 6).Value = "Duplica acumulador"
-            ws.Cells(11, 3).Value = "DEC BX":        ws.Cells(11, 6).Value = "Decrementa factor"
+            ws.Cells(7, 3).Value = "MOV AX, 1":        ws.Cells(7, 6).Value = "Producto acumulado = 1"
+            ws.Cells(8, 3).Value = "MOV BX, 4":        ws.Cells(8, 6).Value = "Contador de factorial N = 4"
+            ws.Cells(9, 3).Value = "STORE [80h], AX":  ws.Cells(9, 6).Value = "Guarda factor actual en RAM"
+            ws.Cells(10, 3).Value = "ADD AX, AX":      ws.Cells(10, 6).Value = "Duplica acumulador"
+            ws.Cells(11, 3).Value = "DEC BX":          ws.Cells(11, 6).Value = "Decrementa factor"
             ws.Cells(12, 3).Value = "STORE [81h], AX": ws.Cells(12, 6).Value = "Guarda resultado parcial"
-            ws.Cells(13, 3).Value = "HLT":           ws.Cells(13, 6).Value = "Detiene ejecucion"
+            ws.Cells(13, 3).Value = "HLT":             ws.Cells(13, 6).Value = "Detiene ejecucion"
 
         Case 4 ' CUENTA REGRESIVA CON ALMACENAMIENTO CONDICIONAL
-            ws.Cells(7, 3).Value = "MOV AX, 5":       ws.Cells(7, 6).Value = "Inicializa contador regresivo en 5"
-            ws.Cells(8, 3).Value = "CICLO:":         ws.Cells(8, 6).Value = "Inicio de bucle regresivo"
-            ws.Cells(9, 3).Value = "STORE [80h], AX": ws.Cells(9, 6).Value = "Guarda valor actual en RAM[80h]"
-            ws.Cells(10, 3).Value = "DEC AX":         ws.Cells(10, 6).Value = "Resta 1 al contador"
-            ws.Cells(11, 3).Value = "JNZ CICLO":      ws.Cells(11, 6).Value = "Repite mientras AX != 0 (ZF=0)"
+            ws.Cells(7, 3).Value = "MOV AX, 5":        ws.Cells(7, 6).Value = "Inicializa contador regresivo en 5"
+            ws.Cells(8, 3).Value = "CICLO:":           ws.Cells(8, 6).Value = "Inicio de bucle regresivo"
+            ws.Cells(9, 3).Value = "STORE [80h], AX":  ws.Cells(9, 6).Value = "Guarda valor actual en RAM[80h]"
+            ws.Cells(10, 3).Value = "DEC AX":          ws.Cells(10, 6).Value = "Resta 1 al contador"
+            ws.Cells(11, 3).Value = "JNZ CICLO":       ws.Cells(11, 6).Value = "Repite mientras AX != 0 (ZF=0)"
             ws.Cells(12, 3).Value = "STORE [80h], AX": ws.Cells(12, 6).Value = "Guarda valor final cero"
-            ws.Cells(13, 3).Value = "HLT":            ws.Cells(13, 6).Value = "Fin de la cuenta"
+            ws.Cells(13, 3).Value = "HLT":             ws.Cells(13, 6).Value = "Fin de la cuenta"
     End Select
     
     ' Ensamblar automaticamente el ejemplo cargado
