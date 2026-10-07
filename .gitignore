@@ -1,0 +1,7 @@
+﻿# Archivos temporales de Office / Excel
+~$*.xlsm
+~$*.xlsx
+*.tmp
+*.bak
+.DS_Store
+Thumbs.db
